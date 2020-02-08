@@ -1,27 +1,26 @@
 def proc main
 
 	def var n 
-	def var i
         def var f = 0
         
 	out "n = "
 	getln n          
 	        
-	i = "%$n - 1" 
+	n = "% $n + 1" 
 	 
-	f = $n
+	f = 1          
 	
 	loop
-	
-		f = "%$f * $i"
-		i = "%$i - 1"
-		
-		if $i = 0 then
-		
+	        
+		if $n = 1 then
+		      
 			break
-			
-		end if
-	        		
+		
+		end if       
+		
+		n = "% $n - 1"
+		f = "% $f * $n"		
+	
 	end loop
 	
 	out "f = "
