@@ -4,6 +4,8 @@ unit l_interpreter;
 
 interface
 
+uses math, types;
+
 const
 
   L_VERSION = '0.1';
@@ -22,9 +24,15 @@ const
 
 procedure l_GetScript(iscript: string);
 procedure l_GetLog(ilog: string);
+procedure l_CloseScript();
+procedure l_CloseLog();
 procedure l_RunProc(iproc: string);
 procedure l_RunLine(iline: string);
-procedure l_Exit();
+procedure l_DefVar(ivar: string; ival: string);
+function  l_GetVal(ivar: string): string;
+procedure l_SetVal(ivar: string; ival: string);
+procedure l_SetConsoleIO();
+procedure l_Clear();
 
 implementation
 
@@ -44,6 +52,8 @@ var
 
   ScriptReady: boolean;
   LogReady   : boolean;
+
+  StandartIO: boolean;
 
   Vars       : array [1..L_MAX_VARS] of tVar;
   Lexems     : array [1..L_MAX_LEXEMS] of string;
@@ -80,15 +90,19 @@ end;
 procedure ErrExit(ierror: integer);
 begin
 
-  case ierror of
+  if (StandartIO = true) then begin
 
-       1: writeln('L_ERR_IO');
-       2: writeln('L_ERR_NE_PROC');
-       3: writeln('L_ERR_STACK_OVERFLOW');
-       4: writeln('L_ERR_NE_VAR');
-       5: writeln('L_ERR_TOO_MANY_VARS');
-       6: writeln('L_ERR_SYNTAX_ERROR');
-       7: writeln('L_ERR_INVALID_ARG');
+    case ierror of
+
+         1: writeln('L_ERR_IO');
+         2: writeln('L_ERR_NE_PROC');
+         3: writeln('L_ERR_STACK_OVERFLOW');
+         4: writeln('L_ERR_NE_VAR');
+         5: writeln('L_ERR_TOO_MANY_VARS');
+         6: writeln('L_ERR_SYNTAX_ERROR');
+         7: writeln('L_ERR_INVALID_ARG');
+
+    end;
 
   end;
 
@@ -110,8 +124,8 @@ begin
 
   Flush();
 
-  Close(ScriptFile);
-  Close(LogFile);
+  if (ScriptReady = true) then Close(ScriptFile);
+  if (LogReady = true) then Close(LogFile);
 
   halt();
 
@@ -310,100 +324,7 @@ begin
 
          end;
 
-         for i:= 1 to length(istr) do begin
-
-           if (istr[i] = ' ') then delete(istr, i, 1);
-
-         end;
-
-         while (true) do begin
-
-           ipos:= length(istr);
-
-           a_v:= 0;
-           b_v:= 0;
-           c_v:= 0;
-
-           a_s:= '';
-           b_s:= '';
-           c_s:= '';
-           l  := 1;
-
-           while (istr[ipos] <> '(') do begin
-
-             ipos:= ipos - 1;
-
-             if (ipos = 0) then break;
-
-           end;
-
-           ipos:= ipos + 1;
-
-           if (istr[ipos] = '+') or (istr[ipos] = '-') then begin
-
-               a_s := a_s + istr[ipos];
-               ipos:= ipos + 1;
-               l   := l + 1;
-
-           end;
-
-           while (true) do begin
-
-             if (istr[ipos] = '+') or (istr[ipos] = '-') or (istr[ipos] = '*') or (istr[ipos] = '/') then break;
-
-             a_s := a_s + istr[ipos];
-             ipos:= ipos + 1;
-             l   := l + 1;
-
-             if (ipos > length(istr)) then begin
-
-               LexemPreprocessor:= a_s;
-               exit;
-
-             end;
-
-           end;
-
-           s   := istr[ipos];
-           ipos:= ipos + 1;
-           l   := l + 1;
-
-           while (istr[ipos] <> ')') and (ipos <= length(istr)) do begin
-
-             b_s := b_s + istr[ipos];
-             ipos:= ipos + 1;
-             l   := l + 1;
-
-           end;
-
-           if (istr[ipos] = ')') then begin
-
-             delete(istr, ipos, 1);
-
-           end else begin
-
-             l:= l - 1;
-
-           end;
-
-           val(a_s, a_v, icode);
-           val(b_s, b_v, icode);
-
-           case s of
-
-                '+': c_v:= a_v + b_v;
-                '-': c_v:= a_v - b_v;
-                '*': c_v:= a_v * b_v;
-                '/': c_v:= a_v div b_v;
-
-           end;
-
-           str(c_v, c_s);
-
-           delete(istr, ipos - l, l);
-           insert(c_s, istr, ipos - l);
-
-         end;
+         Str(math_DoMath(istr), LexemPreprocessor);
 
        end;
 
@@ -539,20 +460,36 @@ begin
 end;
 
 procedure Cmd_Out();
+var
+
+  istr: string;
+
 begin
 
-  write(Lexems[2]);
+  if (StandartIO = false) then exit;
 
-  if (LogReady = true) then write(LogFile, Lexems[2]);
+  istr:= Lexems[2];
+
+  write(istr);
+
+  if (LogReady = true) then write(LogFile, istr);
 
 end;
 
 procedure Cmd_Outln();
+var
+
+  istr: string;
+
 begin
 
-  writeln(Lexems[2]);
+  if (StandartIO = false) then exit;
 
-  if (LogReady = true) then writeln(LogFile, Lexems[2]);
+  istr:= Lexems[2];
+
+  writeln(istr);
+
+  if (LogReady = true) then writeln(LogFile, istr);
 
 end;
 
@@ -562,6 +499,8 @@ var
   istr: string;
 
 begin
+
+  if (StandartIO = false) then exit;
 
   read(istr);
 
@@ -577,6 +516,8 @@ var
   istr: string;
 
 begin
+
+  if (StandartIO = false) then exit;
 
   readln(istr);
 
@@ -849,9 +790,11 @@ begin
 
   Assign(ScriptFile, iscript);
 
-  if (IOResult <> 0) then ErrExit(L_ERR_IO);
-
+  {$I-}
   Reset(ScriptFile);
+  {$I+}
+
+  if (IOResult <> 0) then ErrExit(L_ERR_IO);
 
   ScriptReady:= true;
 
@@ -862,11 +805,27 @@ begin
 
   Assign(LogFile, ilog);
 
+  {$I-}
+  Rewrite(LogFile);
+  {$I+}
+
   if (IOResult <> 0) then ErrExit(L_ERR_IO);
 
-  Rewrite(LogFile);
-
   LogReady:= true;
+
+end;
+
+procedure l_CloseScript();
+begin
+
+  if (ScriptReady = true) then Close(ScriptFile);
+
+end;
+
+procedure l_CloseLog();
+begin
+
+  if (LogReady = true) then Close(LogFile);
 
 end;
 
@@ -890,13 +849,31 @@ begin
 
 end;
 
-procedure l_Exit();
+procedure l_DefVar(ivar: string; ival: string);
 begin
 
-  Flush();
+  DefineVar(ivar, ival);
 
-  if (ScriptReady = true) then Close(ScriptFile);
-  if (LogReady = true) then Close(LogFile);
+end;
+
+procedure l_SetVal(ivar: string; ival: string);
+begin
+
+  Vars[SearchVar(ivar)].vValue:= ival;
+
+end;
+
+function  l_GetVal(ivar: string): string;
+begin
+
+  l_GetVal:= Vars[SearchVar(ivar)].vValue;
+
+end;
+
+procedure l_SetConsoleIO();
+begin
+
+  StandartIO:= true;
 
 end;
 
@@ -909,6 +886,7 @@ begin
 
   ScriptReady:= false;
   LogReady   := false;
+  StandartIO := false;
 
   for i:= 1 to L_MAX_VARS do begin
 
@@ -938,6 +916,18 @@ begin
   end;
 
   LoopSP:= 0;
+
+  CurrentLine:= 0;
+
+end;
+
+procedure l_Clear();
+begin
+
+  if (ScriptReady = true) then Close(ScriptFile);
+  if (LogReady = true) then Close(LogFile);
+
+  Init();
 
 end;
 
