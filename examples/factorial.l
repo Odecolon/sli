@@ -12,11 +12,10 @@ def proc main
 	
 	loop
 	        
-		if $n = 1 then
-		      
-			break
+		if $n = 1 then 
 		
-		end if       
+			break
+		end if      
 		
 		n = "% $n - 1"
 		f = "% $f * $n"		
