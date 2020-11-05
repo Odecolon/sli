@@ -8,11 +8,15 @@ uses math, types;
 
 const
 
-  L_VERSION = '0.1';
+  {Versions}
+
+  L_VERSION = '0.2';
+
+  {Maxes}
 
   L_MAX_VARS   = 64;
-  L_MAX_LEXEMS = 64;
-  L_STACK_SIZE = 64;
+
+  {Error codes}
 
   L_ERR_IO             = 1;
   L_ERR_NE_PROC        = 2;
@@ -21,6 +25,8 @@ const
   L_ERR_TOO_MANY_VARS  = 5;
   L_ERR_SYNTAX_ERROR   = 6;
   L_ERR_INVALID_ARG    = 7;
+
+{Interface}
 
 procedure l_GetScript(iscript: string);
 procedure l_GetLog(ilog: string);
@@ -55,28 +61,20 @@ var
 
   StandartIO: boolean;
 
-  Vars       : array [1..L_MAX_VARS] of tVar;
-  Lexems     : array [1..L_MAX_LEXEMS] of string;
-
-  ReturnStack : array [1..L_STACK_SIZE] of integer;
-  LoopStack   : array [1..L_STACK_SIZE] of integer;
-  ReturnSP    : integer;
-  LoopSP      : integer;
+  Vars        : array [1..L_MAX_VARS] of tVar;
+  Lexems      : tList;
+  ReturnStack : tStack;
+  LoopStack   : tStack;
 
   CurrentLine: integer;
+  StayOn     : boolean;
+
+{Instruments}
 
 procedure Flush();
-var
-
-  i: integer;
-
 begin
 
-  for i:= 1 to L_MAX_LEXEMS do begin
-
-    Lexems[i]:= '';
-
-  end;
+  Lexems.Init();
 
 end;
 
@@ -128,65 +126,6 @@ begin
   if (LogReady = true) then Close(LogFile);
 
   halt();
-
-end;
-
-procedure ReturnPush(ival: integer);
-begin
-
-  if (ReturnSP = L_STACK_SIZE) then ErrExit(L_ERR_STACK_OVERFLOW);
-
-  ReturnSP:= ReturnSP + 1;
-
-  ReturnStack[ReturnSP]:= ival;
-
-end;
-
-function ReturnPull(): integer;
-var
-
-  iswap: integer;
-
-begin
-
-  if ReturnSP = 0 then begin
-
-     ReturnPull:= 0;
-     exit;
-
-  end;
-
-  iswap:= ReturnStack[ReturnSP];
-  ReturnStack[ReturnSP]:= 0;
-  ReturnPull:= iswap;
-  ReturnSP:= ReturnSP - 1;
-
-end;
-
-procedure LoopPush(ival: integer);
-begin
-
-  if (LoopSP = L_STACK_SIZE) then ErrExit(L_ERR_STACK_OVERFLOW);
-
-  LoopSP:= LoopSP + 1;
-
-  LoopStack[LoopSP]:= ival;
-
-end;
-
-function LoopPull(): integer;
-begin
-
-  if LoopSP = 0 then begin
-
-     LoopPull:= 0;
-     exit;
-
-  end;
-
-  LoopPull:= LoopStack[LoopSP];
-  LoopStack[LoopSP]:= 0;
-  LoopSP:= LoopSP - 1;
 
 end;
 
@@ -271,19 +210,9 @@ var
   i   : integer;
   ipos: integer;
 
-  a_v: integer;
-  b_v: integer;
-  c_v: integer;
-
-  a_s: string;
-  b_s: string;
-  c_s: string;
-
-  s    : string;
-  l    : integer;
-  icode: integer;
-
 begin
+
+  LexemPreprocessor:= '';
 
   if (istr = '') then exit;
 
@@ -335,25 +264,21 @@ end;
 procedure ScriptParser(iline: string);
 var
 
-  i :  integer;
-  c :  integer;
+  i: integer;
+  s: string;
 
 begin
 
   i:= 1;
-  c:= 1;
+  s:= '';
+
+  if (StayOn = true) then exit;
 
   Flush();
 
-  for i:= 1 to length(iline) do begin
+  while (true) do begin
 
-    if(iline[i] <> ' ') then break;
-
-  end;
-
-  while (c <= L_MAX_LEXEMS) do begin
-
-    Lexems[c]:= '';
+    while (i < length(iline)) and (iline[i] = ' ') do i:= i + 1;
 
     while (i <= length(iline)) do begin
 
@@ -361,12 +286,10 @@ begin
 
          i:= i + 1;
 
-         while (i <= length(iline)) do begin
+         while (iline[i] <> '"') do begin
 
-           if (iline[i] = '"') then break;
-
-           Lexems[c]:= Lexems[c] + iline[i];
-           i        := i + 1;
+           s:= s + iline[i];
+           i:= i + 1;
 
          end;
 
@@ -376,21 +299,23 @@ begin
 
       end;
 
-      if (iline[i] <> ' ') then Lexems[c]:= Lexems[c] + iline[i];
+      if (iline[i] <> ' ') then s:= s + iline[i];
       if (iline[i] = ' ') and (iline[i + 1] <> ' ') then break;
 
       i:= i + 1;
 
     end;
 
-    Lexems[c]:= LexemPreprocessor(Lexems[c]);
+    Lexems.Append(LexemPreprocessor(s));
 
+    s:= '';
     i:= i + 1;
-    c:= c + 1;
+
+    if (i > length(iline)) then break;
 
   end;
 
-end;
+end;  
 
 procedure SearchProc(iproc: string);
 var
@@ -410,7 +335,7 @@ begin
 
     CurrentLine:= CurrentLine + 1;
 
-    if (UpCase(Lexems[1]) = 'DEF') and (UpCase(Lexems[2]) = 'PROC') and (Lexems[3] = iproc) then begin
+    if (UpCase(Lexems.List[1]) = 'DEF') and (UpCase(Lexems.List[2]) = 'PROC') and (Lexems.List[3] = iproc) then begin
 
        exit;
 
@@ -453,11 +378,15 @@ var
 
 begin
 
+  if (StayOn = true) then exit;
+
   readln(ScriptFile, line);
   ScriptParser(RemoveCmdSymbols(line));
   CurrentLine:= CurrentLine + 1;
 
 end;
+
+{Commands}
 
 procedure Cmd_Out();
 var
@@ -468,7 +397,7 @@ begin
 
   if (StandartIO = false) then exit;
 
-  istr:= Lexems[2];
+  istr:= Lexems.List[2];
 
   write(istr);
 
@@ -485,7 +414,7 @@ begin
 
   if (StandartIO = false) then exit;
 
-  istr:= Lexems[2];
+  istr:= Lexems.List[2];
 
   writeln(istr);
 
@@ -506,7 +435,7 @@ begin
 
   if (LogReady = true) then write(LogFile, istr);
 
-  Vars[SearchVar(Lexems[2])].vValue:= istr;
+  Vars[SearchVar(Lexems.List[2])].vValue:= istr;
 
 end;
 
@@ -523,30 +452,30 @@ begin
 
   if (LogReady = true) then writeln(LogFile, istr);
 
-  Vars[SearchVar(Lexems[2])].vValue:= istr;
+  Vars[SearchVar(Lexems.List[2])].vValue:= istr;
 
 end;
 
 procedure Cmd_Do();
 begin
 
-  ReturnPush(CurrentLine);
-  SearchProc(Lexems[2]);
+  ReturnStack.Push(CurrentLine);
+  SearchProc(Lexems.List[2]);
 
 end;
 
 procedure Cmd_Def();
 begin
 
-  if (UpCase(Lexems[2]) = 'VAR') and (Lexems[3] <> '') then begin
+  if (UpCase(Lexems.List[2]) = 'VAR') and (Lexems.List[3] <> '') then begin
 
-     if (Lexems[4] = '=') then begin
+     if (Lexems.List[4] = '=') then begin
 
-       DefineVar(Lexems[3], Lexems[5]);
+       DefineVar(Lexems.List[3], Lexems.List[5]);
 
      end else begin
 
-       DefineVar(Lexems[3], '');
+       DefineVar(Lexems.List[3], '');
 
      end;
 
@@ -557,7 +486,7 @@ end;
 procedure Cmd_Del();
 begin
 
-  DeleteVar(Lexems[2]);
+  DeleteVar(Lexems.List[2]);
 
 end;
 
@@ -573,24 +502,24 @@ var
 
 begin
 
-  if (UpCase(Lexems[5]) <> 'THEN') then ErrExit(L_ERR_SYNTAX_ERROR);
+  if (UpCase(Lexems.List[5]) <> 'THEN') then ErrExit(L_ERR_SYNTAX_ERROR);
 
   c:= false;
 
-  case Lexems[3] of
+  case Lexems.List[3] of
 
        '=': begin
 
-         if (Lexems[2] = Lexems[4]) then c:= true;
+         if (Lexems.List[2] = Lexems.List[4]) then c:= true;
 
        end;
 
        '>': begin
 
-         Val(Lexems[2], a, ic);
+         Val(Lexems.List[2], a, ic);
          if (ic <> 0) then ErrExit(L_ERR_INVALID_ARG);
 
-         Val(Lexems[4], b, ic);
+         Val(Lexems.List[4], b, ic);
          if (ic <> 0) then ErrExit(L_ERR_INVALID_ARG);
 
          if (a > b) then c:= true;
@@ -599,10 +528,10 @@ begin
 
        '<': begin
 
-         Val(Lexems[2], a, ic);
+         Val(Lexems.List[2], a, ic);
          if (ic <> 0) then ErrExit(L_ERR_INVALID_ARG);
 
-         Val(Lexems[4], b, ic);
+         Val(Lexems.List[4], b, ic);
          if (ic <> 0) then ErrExit(L_ERR_INVALID_ARG);
 
          if (a < b) then c:= true;
@@ -611,10 +540,10 @@ begin
 
        '>=': begin
 
-         Val(Lexems[2], a, ic);
+         Val(Lexems.List[2], a, ic);
          if (ic <> 0) then ErrExit(L_ERR_INVALID_ARG);
 
-         Val(Lexems[4], b, ic);
+         Val(Lexems.List[4], b, ic);
          if (ic <> 0) then ErrExit(L_ERR_INVALID_ARG);
 
          if (a >= b) then c:= true;
@@ -623,10 +552,10 @@ begin
 
        '<=': begin
 
-         Val(Lexems[2], a, ic);
+         Val(Lexems.List[2], a, ic);
          if (ic <> 0) then ErrExit(L_ERR_INVALID_ARG);
 
-         Val(Lexems[4], b, ic);
+         Val(Lexems.List[4], b, ic);
          if (ic <> 0) then ErrExit(L_ERR_INVALID_ARG);
 
          if (a <= b) then c:= true;
@@ -635,10 +564,10 @@ begin
 
        '!=': begin
 
-         Val(Lexems[2], a, ic);
+         Val(Lexems.List[2], a, ic);
          if (ic <> 0) then ErrExit(L_ERR_INVALID_ARG);
 
-         Val(Lexems[4], b, ic);
+         Val(Lexems.List[4], b, ic);
          if (ic <> 0) then ErrExit(L_ERR_INVALID_ARG);
 
          if (a <> b) then c:= true;
@@ -647,16 +576,31 @@ begin
 
   end;
 
-  if (c = false) then begin
+  if (Lexems.Size > 5) then begin
 
-    n:= 1;
+     if (c = true) then begin
 
-    while (n <> 0) do begin
+       while (UpCase(Lexems.List[1]) <> 'THEN') do Lexems.Delete(1);
+       Lexems.Delete(1);
 
-      GetLine();
+       StayOn:= true;
 
-      If (UpCase(Lexems[1]) = 'IF') then n:= n + 1;
-      If (UpCase(Lexems[1]) = 'END') and (UpCase(Lexems[2]) = 'IF') then n:= n - 1;
+     end;
+
+  end else begin
+
+    if (c = false) then begin
+
+       n:= 1;
+
+       while (n <> 0) do begin
+
+         GetLine();
+
+           if (UpCase(Lexems.List[1]) = 'IF') then n:= n + 1;
+           if (UpCase(Lexems.List[1]) = 'END') and (UpCase(Lexems.List[2]) = 'IF') then n:= n - 1;
+
+       end;
 
     end;
 
@@ -667,7 +611,7 @@ end;
 procedure Cmd_Loop();
 begin
 
-  LoopPush(CurrentLine);
+  LoopStack.Push(CurrentLine);
 
 end;
 
@@ -678,12 +622,12 @@ var
 
 begin
 
-  if (UpCase(Lexems[2]) = 'LOOP') then begin
+  if (UpCase(Lexems.List[2]) = 'LOOP') then begin
 
-    i:= LoopPull();
+    i:= LoopStack.Pull();
 
     GotoLine(i);
-    LoopPush(i);
+    LoopStack.Push(i);
 
   end;
 
@@ -696,11 +640,11 @@ var
 
 begin
 
-  i:= LoopPull();
+  i:= LoopStack.Pull();
 
   if (i <> 0) then begin
 
-    LoopPush(i);
+    LoopStack.Push(i);
     GotoLine(i);
 
   end;
@@ -708,28 +652,28 @@ begin
 end;
 
 procedure Cmd_Break();
-var
-
-  i: integer;
-
 begin
 
-  i:= LoopPull();
+  LoopStack.PullOut();
 
   while (true) do begin
 
     GetLine();
 
-    if (UpCase(Lexems[1]) = 'END') and (UpCase(Lexems[2]) = 'LOOP') then break;
+    if (UpCase(Lexems.List[1]) = 'END') and (UpCase(Lexems.List[2]) = 'LOOP') then break;
 
   end;
 
 end;
 
+{Main structures}
+
 procedure ExecuteLine();
 begin
 
-  case UpCase(Lexems[1]) of
+  if (StayOn = true) then StayOn:= false;
+
+  case UpCase(Lexems.List[1]) of
 
        'OUTLN'   : Cmd_Outln();
        'GETLN'   : Cmd_Getln();
@@ -746,7 +690,7 @@ begin
 
   else begin
 
-       if (Lexems[2] = '=') then Vars[SearchVar(Lexems[1])].vValue:= Lexems[3];
+       if (Lexems.List[2] = '=') then Vars[SearchVar(Lexems.List[1])].vValue:= Lexems.List[3];
 
        end;
 
@@ -767,14 +711,14 @@ begin
 
   while (true) do begin
 
-    if ((UpCase(Lexems[1]) = 'END') and (UpCase(Lexems[2]) = 'DEF')) or (UpCase(Lexems[1]) = 'RETURN') then break;
+    if ((UpCase(Lexems.List[1]) = 'END') and (UpCase(Lexems.List[2]) = 'DEF')) or (UpCase(Lexems.List[1]) = 'RETURN') then break;
 
     GetLine();
     ExecuteLine();
 
   end;
 
-  iline:= ReturnPull();
+  iline:= ReturnStack.Pull();
 
   if (iline <> 0) then begin
 
@@ -784,6 +728,35 @@ begin
   end;
 
 end;
+
+procedure Init();
+var
+
+  i: integer;
+
+begin
+
+  ScriptReady:= false;
+  LogReady   := false;
+  StandartIO := false;
+
+  for i:= 1 to L_MAX_VARS do begin
+
+    Vars[i].vName := '';
+    Vars[i].vValue:= '';
+
+  end;
+
+  Lexems.Init();
+  ReturnStack.Init();
+  LoopStack.Init();
+
+  CurrentLine:= 0;
+  StayOn     := false;
+
+end;
+
+{Interface implementations}
 
 procedure l_GetScript(iscript: string);
 begin
@@ -874,50 +847,6 @@ procedure l_SetConsoleIO();
 begin
 
   StandartIO:= true;
-
-end;
-
-procedure Init();
-var
-
-  i: integer;
-
-begin
-
-  ScriptReady:= false;
-  LogReady   := false;
-  StandartIO := false;
-
-  for i:= 1 to L_MAX_VARS do begin
-
-    Vars[i].vName := '';
-    Vars[i].vValue:= '';
-
-  end;
-
-  for i:= 1 to L_MAX_LEXEMS do begin
-
-    Lexems[i]:= '';
-
-  end;
-
-  for i:= 1 to L_STACK_SIZE do begin
-
-    ReturnStack[i]:= 0;
-
-  end;
-
-  ReturnSP:= 0;
-
-  for i:= 1 to L_STACK_SIZE do begin
-
-    LoopStack[i]:= 0;
-
-  end;
-
-  LoopSP:= 0;
-
-  CurrentLine:= 0;
 
 end;
 

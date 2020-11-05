@@ -4,13 +4,14 @@ interface
 
 const
 
-SIZE_LIST = 64;
+TYPES_SIZE_LIST  = 64;
+TYPES_SIZE_STACK = 128;
 
 type
 
   tList = object
 
-    List: array [1..SIZE_LIST] of string;
+    List: array [1..TYPES_SIZE_LIST] of string;
     Size: integer;
 
     procedure Init();
@@ -21,7 +22,21 @@ type
 
   end;
 
+  tStack = object
+
+    Stack: array [1..TYPES_SIZE_STACK] of integer;
+    Size : integer;
+
+    procedure Init();
+    procedure Push(n: integer);
+    function  Pull(): integer;
+    procedure PullOut();
+
+  end;
+
 implementation
+
+{tList}
 
 procedure tList.Init();
 var
@@ -30,7 +45,7 @@ var
 
 begin
 
-  for i:= 1 to SIZE_LIST do begin
+  for i:= 1 to TYPES_SIZE_LIST do begin
 
     List[i]:= '';
 
@@ -43,7 +58,7 @@ end;
 procedure tList.Append(s: string);
 begin
 
-  if (Size + 1 >  SIZE_LIST) then exit;
+  if (Size + 1 >  TYPES_SIZE_LIST) then exit;
 
   Size      := Size + 1;
   List[Size]:= s;
@@ -88,11 +103,11 @@ begin
 
    Search:= 0;
 
-   if (p <= 0) or (p > SIZE_LIST) then exit;
+   if (p <= 0) or (p > TYPES_SIZE_LIST) then exit;
 
    if (r = false) then begin
 
-      for i:= p to SIZE_LIST do begin
+      for i:= p to TYPES_SIZE_LIST do begin
 
         if (List[i] = s) then begin
 
@@ -105,7 +120,7 @@ begin
 
    end else begin
 
-      for i:= SIZE_LIST downto p do begin
+      for i:= TYPES_SIZE_LIST downto p do begin
 
         if (List[i] = s) then begin
 
@@ -143,6 +158,57 @@ begin
   end;
 
   writeln('"' + List[Size] + '"]');
+
+end;
+
+{tStack}
+
+procedure tStack.Init();
+var
+
+   i: integer;
+
+begin
+
+  for i:= 1 to TYPES_SIZE_STACK do begin
+
+    Stack[i]:= 0;
+
+  end;
+
+  Size:= 0;
+
+end;
+
+procedure tStack.Push(n: integer);
+begin
+
+  if (Size + 1 > TYPES_SIZE_STACK) then exit;
+
+  Size       := Size + 1;
+  Stack[Size]:= n;
+
+end;
+
+procedure tStack.PullOut();
+begin
+
+  if (Size - 1 < 0) then exit;
+
+  Stack[Size]:= 0;
+  Size       := Size - 1;
+
+end;
+
+function tStack.Pull(): integer;
+begin
+
+  Pull:= 0;
+
+  if (Size - 1 < 0) then exit;
+
+  Pull:= Stack[Size];
+  Size:= Size - 1;
 
 end;
 

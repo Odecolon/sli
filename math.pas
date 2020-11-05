@@ -5,6 +5,8 @@ interface
 uses types;
 
 function math_DoMath(iline: string): integer;
+function math_BinaryToInt(iline: string): integer;
+function math_IntToBinary(n: integer): string;
 
 implementation
 
@@ -20,7 +22,21 @@ const
 
 var
 
-   Line: tList;
+  Line: tList;
+
+function Power(a, n: integer): integer;
+begin
+
+  Power:= 1;
+
+  while (n <> 0) do begin
+
+    Power:= Power * a;
+    n    := n - 1;
+
+  end;
+
+end;
 
 function CheckAll(s: string): boolean;
 begin
@@ -279,6 +295,88 @@ begin
     Line.Delete(b);
 
   end;
+
+end;
+
+function math_BinaryToInt(iline: string): integer;
+var
+
+  i: integer;
+
+begin
+
+  math_BinaryToInt:= 0;
+
+  for i:= length(iline) downto 1 do begin
+
+    if (iline[i] = '1') then math_BinaryToInt:= math_BinaryToInt + Power(2, length(iline) - i);
+
+  end;
+
+end;
+
+function math_IntToBinary(n: integer): string;
+var
+
+  i: integer;
+  a: integer;
+
+  s: string;
+  o: string;
+
+begin
+
+  math_IntToBinary:= '';
+  s               := '';
+  o               := '';
+
+  if (n = 0) then begin
+
+     math_IntToBinary:= '';
+     exit;
+
+  end;
+
+  a:= 0;
+  i:= 0;
+
+  for i:= 0 to n do begin
+
+    if (Power(2, i) > n) then begin
+
+       a:= i - 1;
+       break;
+
+    end;
+
+  end;
+
+  while (a >= 0) do begin
+
+    if (n - Power(2, a) >= 0) then begin
+
+       n:= n - Power(2, a);
+       insert('1', s, 0);
+
+    end else begin
+
+      insert('0', s, 0);
+
+    end;
+
+    a:= a - 1;
+
+  end;
+
+  o:= s;
+
+  for i:= 1 to length(s) do begin
+
+    o[i]:= s[length(s) - i + 1];
+
+  end;
+
+  math_IntToBinary:= o;
 
 end;
 
